@@ -62,7 +62,8 @@ class LogEvent(object):
         self._year_rollover = False
         if isinstance(doc_or_str, bytes):
             doc_or_str = doc_or_str.decode("utf-8")
-
+        if isinstance(doc_or_str, str) and doc_or_str.startswith('{'):
+            self.from_json(doc_or_str)
         if isinstance(doc_or_str, str) or (sys.version_info.major == 2 and
                                            isinstance(doc_or_str, unicode)):
             # create from string, remove line breaks at end of _line_str
