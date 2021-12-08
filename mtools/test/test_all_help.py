@@ -3,7 +3,6 @@ import sys
 from mtools.test import all_tools
 
 
-@all_tools
 def test_help(tool_cls):
     """
     Check that all command line tools have a --help option that explains the
@@ -23,7 +22,6 @@ def test_help(tool_cls):
         assert output.startswith('usage:')
 
 
-@all_tools
 def test_version(tool_cls):
     """
     Check that all command line tools have a --version option that returns

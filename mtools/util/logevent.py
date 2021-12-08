@@ -60,17 +60,21 @@ class LogEvent(object):
     def __init__(self, doc_or_str):
         self._debug = False
         self._year_rollover = False
+
         if isinstance(doc_or_str, bytes):
             doc_or_str = doc_or_str.decode("utf-8")
+
         if isinstance(doc_or_str, str) and doc_or_str.startswith('{'):
             self.from_json(doc_or_str)
-        if isinstance(doc_or_str, str) or (sys.version_info.major == 2 and
-                                           isinstance(doc_or_str, unicode)):
+            self._reset()
+
+        if isinstance(doc_or_str, str) or (sys.version_info.major == 2 and isinstance(doc_or_str, re.UNICODE)):
             # create from string, remove line breaks at end of _line_str
             self.from_string = True
             self._line_str = doc_or_str.rstrip()
             self._profile_doc = None
             self._reset()
+
         else:
             self.from_string = False
             self._profile_doc = doc_or_str
@@ -1096,7 +1100,9 @@ class LogEvent(object):
         """Convert LogEvent object to valid JSON."""
         output = self.to_dict(labels)
         return json.dumps(output, cls=DateTimeEncoder, ensure_ascii=False)
-
+    def json2pattern(self, json_str):
+        """Convert JSON string to a query pattern."""
+        doc = json.loads(json_str)
     def _parse_document(self):
         """Parse system.profile doc, copy all values to member variables."""
         self._reset()

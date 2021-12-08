@@ -4,20 +4,15 @@ import os
 import shutil
 import sys
 import time
-import unittest
 
 from bson import SON
-from nose.plugins.attrib import attr
-from nose.plugins.skip import SkipTest
-from nose.tools import raises, timed
+
+import pytest
+
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure
 
 from mtools.mlaunch.mlaunch import MLaunchTool
-
-# temporarily skipping mlaunch tests until issues are sorted out
-raise SkipTest
-
 
 class TestMLaunch(object):
     """
@@ -33,20 +28,21 @@ class TestMLaunch(object):
     base_dir = 'data_test_mlaunch'
 
     def __init__(self):
-        """Constructor."""
+        """TODO: convert to pytest (__init__ will skip all tests)"""
         self.use_auth = False
         self.data_dir = ''
 
-    def setup(self):
+    @pytest.fixture(autouse=True)
+    def setup_class(self):
         """Start up method to create mlaunch tool and find free port."""
+        self.base_dir = 'data_test_mlaunch'
         self.tool = MLaunchTool(test=True)
+        self.tool.args = {'verbose': False}
+        self.mongod_version = self.tool.getMongoDVersion()
 
-        # if the test data path exists, remove it
-        if os.path.exists(self.base_dir):
-            shutil.rmtree(self.base_dir)
+        yield
 
-    def teardown(self):
-        """Tear down method after each test, removes data directory."""
+        """Tear down method after each test"""
 
         # kill all running processes
         self.tool.discover()
@@ -87,27 +83,28 @@ class TestMLaunch(object):
 
     # -- tests below ---
 
-    @raises(ConnectionFailure)
     def test_test(self):
         """TestMLaunch setup and teardown test."""
 
-        # test that data dir does not exist
-        assert not os.path.exists(self.data_dir)
+        with pytest.raises(ConnectionFailure):
 
-        # start mongo process on free test port
-        self.run_tool("init --single")
+            # test that data dir does not exist
+            assert not os.path.exists(self.data_dir)
 
-        # call teardown method within this test
-        self.teardown()
+            # start mongo process on free test port
+            self.run_tool("init --single")
 
-        # test that data dir does not exist anymore
-        assert not os.path.exists(self.data_dir)
+            # call teardown method within this test
+            self.teardown()
 
-        # test that mongod is not running on this port anymore
-        # (raises ConnectionFailure)
-        mc = MongoClient('localhost:%i' % self.port,
-                         serverSelectionTimeoutMS=100).server_info()
-        print(mc['version'])
+            # test that data dir does not exist anymore
+            assert not os.path.exists(self.data_dir)
+
+            # test that mongod is not running on this port anymore
+            # (raises ConnectionFailure)
+            mc = MongoClient('localhost:%i' % self.port,
+                            serverSelectionTimeoutMS=100).server_info()
+            print(mc['version'])
 
     def test_argv_run(self):
         """
@@ -184,8 +181,7 @@ class TestMLaunch(object):
         assert sum(1 for memb in conf['members']
                    if 'arbiterOnly' in memb and memb['arbiterOnly']) == 1
 
-    @timed(60)
-    @attr('slow')
+    @pytest.mark.timeout(60, "slow", method="thread")
     def test_replicaset_ismaster(self):
         """Start replica set and verify that first node becomes primary."""
 
@@ -200,7 +196,7 @@ class TestMLaunch(object):
         mc = MongoClient('localhost:%i' % self.port)
         mc.test.smokeWait.insert({}, w=2, wtimeout=10 * 60 * 1000)
 
-    @unittest.skip('incompatible with 3.4 CSRS')
+    @pytest.mark.skip('incompatible with 3.4 CSRS')
     def test_sharded_status(self):
         """Start cluster with 2 shards of single nodes, 1 config server."""
 
@@ -225,7 +221,7 @@ class TestMLaunch(object):
         return len(filter(None, [all([kw in line for kw in keywords])
                                  for line in output]))
 
-    @unittest.skip('incompatible with 3.4 CSRS')
+    @pytest.mark.skip('incompatible with 3.4 CSRS')
     def test_verbose_sharded(self):
         """Test verbose output when creating sharded cluster."""
 
@@ -481,9 +477,8 @@ class TestMLaunch(object):
         nodes = self.tool.get_tagged('all')
         assert all(self.tool.is_running(node) for node in nodes)
 
-    @unittest.skip('tags implementation not up to date')
-    @timed(180)
-    @attr('slow')
+    @pytest.mark.skip('tags implementation not up to date')
+    @pytest.mark.timeout(180, "slow", method="thread")
     def test_kill_partial(self):
         """Test killing and restarting tagged groups on different tags."""
 
@@ -568,7 +563,7 @@ class TestMLaunch(object):
                                                                1)]))
         assert loglevel[u'logLevel'] == 0
 
-    @unittest.skip('currently not a useful test')
+    @pytest.mark.skip('currently not a useful test')
     def test_start_stop_single_repeatedly(self):
         """Test starting and stopping single node in short succession."""
 
@@ -584,22 +579,22 @@ class TestMLaunch(object):
 
             self.run_tool("start")
 
-    @raises(SystemExit)
     def test_init_init_replicaset(self):
-        """mlaunch: test calling init a second time on the replica set."""
+        with pytest.raises(SystemExit):
+            """mlaunch: test calling init a second time on the replica set."""
 
-        # init a replica set
-        self.run_tool("init --replicaset")
+            # init a replica set
+            self.run_tool("init --replicaset")
 
-        # now stop and init again, this should work if everything is
-        # stopped and identical environment
-        self.run_tool("stop")
-        self.run_tool("init --replicaset")
+            # now stop and init again, this should work if everything is
+            # stopped and identical environment
+            self.run_tool("stop")
+            self.run_tool("init --replicaset")
 
-        # but another init should fail with a SystemExit
-        self.run_tool("init --replicaset")
+            # but another init should fail with a SystemExit
+            self.run_tool("init --replicaset")
 
-    @unittest.skip('currently not a useful test')
+    @pytest.mark.skip('currently not a useful test')
     def test_start_stop_replicaset_repeatedly(self):
         """Test starting and stopping replica set in short succession."""
 
@@ -615,8 +610,8 @@ class TestMLaunch(object):
 
             self.run_tool("start")
 
-    @attr('slow')
-    @attr('auth')
+    @pytest.mark.slow
+    @pytest.mark.auth
     def test_repeat_all_with_auth(self):
         """Repeates all tests in this class (excluding itself) with auth."""
         tests = [t for t in inspect.getmembers(self,
@@ -637,7 +632,7 @@ class TestMLaunch(object):
 
         self.use_auth = False
 
-    @attr('auth')
+    @pytest.mark.auth
     def test_replicaset_with_name(self):
         """mlaunch: test calling init on the replica set with given name."""
 
@@ -653,7 +648,7 @@ class TestMLaunch(object):
     # TODO
     # - test functionality of --binarypath, --verbose
 
-    # All tests that use auth need to be decorated with @attr('auth')
+    # All tests that use auth need to be decorated with @pytest.mark.auth
 
     def helper_adding_default_user(self, environment):
         """Helper function for the next test: test_adding_default_user()."""
@@ -671,7 +666,7 @@ class TestMLaunch(object):
                     for x in user['roles']]) == set(self.tool.
                                                     _default_auth_roles))
 
-    @attr('auth')
+    @pytest.mark.auth
     def test_adding_default_user(self):
         envs = (
             "--single",
@@ -687,7 +682,7 @@ class TestMLaunch(object):
                     ', with ' + env)
             yield (method, env)
 
-    @attr('auth')
+    @pytest.mark.auth
     def test_adding_default_user_no_mongos(self):
         """mlaunch: test that even with --mongos 0 there is a user created."""
 
@@ -704,7 +699,7 @@ class TestMLaunch(object):
                     for x in user['roles']]) == set(self.tool.
                                                     _default_auth_roles))
 
-    @attr('auth')
+    @pytest.mark.auth
     def test_adding_custom_user(self):
         """mlaunch: test custom username and password and custom roles."""
 
@@ -736,7 +731,7 @@ class TestMLaunch(object):
         except SystemExit as e:
             assert 'different environment already exists' in e.message
 
-    @unittest.skip('mlaunch protocol upgrade is not needed at this point')
+    @pytest.mark.skip('mlaunch protocol upgrade is not needed at this point')
     def test_upgrade_v1_to_v2(self):
         """mlaunch: test upgrade from protocol version 1 to 2."""
 
@@ -824,11 +819,11 @@ class TestMLaunch(object):
             assert(self.tool.startup_info[str(self.port)].
                    startswith('/some/other/path/mongod'))
 
-    @raises(SystemExit)
     def test_single_and_arbiter(self):
         """mlaunch: test --single with --arbiter error."""
 
-        self.run_tool("init --single --arbiter")
+        with pytest.raises(SystemExit):
+            self.run_tool("init --single --arbiter")
 
     def test_oplogsize_config(self):
         """mlaunch: test config server never receives --oplogSize parameter."""

@@ -8,6 +8,7 @@ import mtools
 from mtools.mloginfo.mloginfo import MLogInfoTool
 from mtools.util.logfile import LogFile
 
+import pytest
 
 def random_date(start, end):
     """
@@ -22,7 +23,9 @@ def random_date(start, end):
 class TestMLogInfo(object):
     """This class tests functionality around the mloginfo tool."""
 
-    def setup(self):
+    # Setup & teardown functions
+    @pytest.fixture(autouse=True)
+    def setup_class(self):
         """Startup method to create mloginfo tool."""
         self.tool = MLogInfoTool()
         self._test_init()
@@ -35,7 +38,7 @@ class TestMLogInfo(object):
 
     def test_basic(self):
         self.tool.run('%s' % self.logfile_path)
-        output = sys.stdout.getvalue()
+        output = sys.stdout.execute()
         results = self._parse_output(output)
 
         assert results['source'].endswith('mongod_225.log')
@@ -50,7 +53,7 @@ class TestMLogInfo(object):
     def test_28(self):
         self._test_init('mongod_278.log')
         self.tool.run('%s' % self.logfile_path)
-        output = sys.stdout.getvalue()
+        output = sys.stdout.execute()
         results = {}
         for line in output.splitlines():
             if line.strip() == '':
@@ -71,13 +74,13 @@ class TestMLogInfo(object):
     def test_28_no_restart(self):
         self._test_init('mongod_278_partial.log')
         self.tool.run('%s' % self.logfile_path)
-        lines = sys.stdout.getvalue().splitlines()
+        lines = sys.stdout.execute().splitlines()
         assert any(map(lambda line: '>= 3.0 (iso8601 format, level, component)'
                        in line, lines))
 
     def test_multiple_files(self):
         self.tool.run('%s %s' % (self.logfile_path, self.logfile_path))
-        output = sys.stdout.getvalue()
+        output = sys.stdout.execute()
         lines = output.splitlines()
         assert len([l for l in lines if l.strip().startswith('source')]) == 2
         assert len([l for l in lines if l.strip().startswith('start')]) == 2
@@ -87,7 +90,7 @@ class TestMLogInfo(object):
     def test_30_ctime(self):
         self._test_init('mongod_306_ctime.log')
         self.tool.run('%s' % self.logfile_path)
-        output = sys.stdout.getvalue()
+        output = sys.stdout.execute()
         results = {}
         for line in output.splitlines():
             if line.strip() == '':
@@ -105,7 +108,7 @@ class TestMLogInfo(object):
     def test_30_ctime_queries(self):
         self._test_init('mongod_306_ctime.log')
         self.tool.run('%s --queries' % self.logfile_path)
-        output = sys.stdout.getvalue()
+        output = sys.stdout.execute()
         lines = output.splitlines()
         assert any(map(lambda line: 'QUERIES' in line, lines))
         assert not (any(map(lambda line: line.startswith('no queries found'),
@@ -117,7 +120,7 @@ class TestMLogInfo(object):
         logfile_path = os.path.join(os.path.dirname(mtools.__file__),
                                     'test/logfiles/', 'year_rollover.log')
         self.tool.run('%s' % logfile_path)
-        output = sys.stdout.getvalue()
+        output = sys.stdout.execute()
         lines = output.splitlines()
         assert any(map(lambda line: ('version: >= 2.4.x ctime '
                                      '(milliseconds present)') in line, lines))
@@ -125,7 +128,7 @@ class TestMLogInfo(object):
     def test_distinct_output(self):
         # different log file
         self.tool.run('%s --distinct' % self.logfile_path)
-        output = sys.stdout.getvalue()
+        output = sys.stdout.execute()
         lines = output.splitlines()
         assert any(map(lambda line: 'DISTINCT' in line, lines))
         assert len(list(filter(lambda line: re.match(r'\s+\d+\s+\w+', line),
@@ -134,7 +137,7 @@ class TestMLogInfo(object):
     def test_connections_output(self):
         # different log file
         self.tool.run('%s --connections' % self.logfile_path)
-        output = sys.stdout.getvalue()
+        output = sys.stdout.execute()
         lines = output.splitlines()
         assert any(map(lambda line: 'CONNECTIONS' in line, lines))
 
@@ -148,7 +151,7 @@ class TestMLogInfo(object):
     def test_connstats_output(self):
         # different log file
         self.tool.run('%s --connstats' % self.logfile_path)
-        output = sys.stdout.getvalue()
+        output = sys.stdout.execute()
         lines = output.splitlines()
         assert any(map(lambda line: 'CONNECTIONS' in line, lines))
 
@@ -168,7 +171,7 @@ class TestMLogInfo(object):
     def test_connections_connstats_output(self):
         # different log file
         self.tool.run('%s --connections --connstats' % self.logfile_path)
-        output = sys.stdout.getvalue()
+        output = sys.stdout.execute()
         lines = output.splitlines()
         assert any(map(lambda line: 'CONNECTIONS' in line, lines))
 
@@ -223,7 +226,7 @@ class TestMLogInfo(object):
                                      'connid_notdigit.log'))
 
         self.tool.run('%s --connstats' % logfile_path)
-        output = sys.stdout.getvalue()
+        output = sys.stdout.execute()
         lines = output.splitlines()
 
         assert any(map(lambda line:
@@ -242,7 +245,7 @@ class TestMLogInfo(object):
                                      'connid_notdigit.log'))
 
         self.tool.run('%s --connstats' % logfile_path)
-        output = sys.stdout.getvalue()
+        output = sys.stdout.execute()
         lines = output.splitlines()
 
         assert any(map(lambda line: 'overall average connection duration(s): 1'
@@ -259,7 +262,7 @@ class TestMLogInfo(object):
                                      'only_connection_end.log'))
 
         self.tool.run('%s --connstats' % logfile_path)
-        output = sys.stdout.getvalue()
+        output = sys.stdout.execute()
         lines = output.splitlines()
 
         assert any(map(lambda line: 'overall average connection duration(s): -'
@@ -276,7 +279,7 @@ class TestMLogInfo(object):
                                      'only_connection_accepted.log'))
 
         self.tool.run('%s --connstats' % logfile_path)
-        output = sys.stdout.getvalue()
+        output = sys.stdout.execute()
         lines = output.splitlines()
 
         assert any(map(lambda line: 'overall average connection duration(s): -'
@@ -289,7 +292,7 @@ class TestMLogInfo(object):
     def test_queries_output(self):
         # different log file
         self.tool.run('%s --queries' % self.logfile_path)
-        output = sys.stdout.getvalue()
+        output = sys.stdout.execute()
         lines = output.splitlines()
         assert any(map(lambda line: 'QUERIES' in line, lines))
         assert any(map(lambda line: line.startswith('namespace'), lines))
@@ -300,7 +303,7 @@ class TestMLogInfo(object):
         # different log file
         self.logfile_path = "mtools/test/logfiles/mongod_4.0.10_storagestats.log"
         self.tool.run('%s --storagestats' % self.logfile_path)
-        output = sys.stdout.getvalue()
+        output = sys.stdout.execute()
         lines = output.splitlines()
         assert any(map(lambda line: '' in line, lines))
         assert any(map(lambda line: line.startswith('STORAGE STATISTICS '), lines))
@@ -309,7 +312,7 @@ class TestMLogInfo(object):
         # different log file
         logfile_transactions_path = 'mtools/test/logfiles/mongod_4.0.10_slowtransactions.log'
         self.tool.run('%s --transactions' % logfile_transactions_path)
-        output = sys.stdout.getvalue()
+        output = sys.stdout.execute()
         lines = output.splitlines()
         assert any(map(lambda line: 'TRANSACTIONS' in line, lines))
         assert any(map(lambda line: line.startswith('DATETIME'), lines))
@@ -318,14 +321,14 @@ class TestMLogInfo(object):
         # different log file
         logfile_path = "mtools/test/logfiles/mongod_4.0.10_reapedcursor.log"
         self.tool.run('%s --cursors' % logfile_path)
-        output = sys.stdout.getvalue()
+        output = sys.stdout.execute()
         lines = output.splitlines()
         assert any('CURSOR' in line for line in lines)
 
     def test_restarts_output(self):
         # different log file
         self.tool.run('%s --restarts' % self.logfile_path)
-        output = sys.stdout.getvalue()
+        output = sys.stdout.execute()
         lines = output.splitlines()
         assert any(map(lambda line: 'RESTARTS' in line, lines))
         assert any(map(lambda line: 'version 2.2.5' in line, lines))
@@ -336,7 +339,7 @@ class TestMLogInfo(object):
                                     'test/logfiles/', 'mongod_26_corrupt.log')
         self.tool.run('%s --queries' % logfile_path)
 
-        output = sys.stdout.getvalue()
+        output = sys.stdout.execute()
         lines = output.splitlines()
         assert any(map(lambda line: 'QUERIES' in line, lines))
         assert any(map(lambda line: line.startswith('namespace'), lines))
@@ -368,7 +371,7 @@ class TestMLogInfo(object):
         """ utility test runner for rsstate
         """
         self.tool.run('%s --rsstate' % logfile_path)
-        output = sys.stdout.getvalue()
+        output = sys.stdout.execute()
         lines = output.splitlines()
         assert len(list(filter(lambda line: re.match(pattern, line),
                           lines))) == expected
@@ -392,7 +395,7 @@ class TestMLogInfo(object):
         """ utility test runner for rsstate
         """
         self.tool.run('--rsinfo %s' % logfile_path)
-        output = sys.stdout.getvalue()
+        output = sys.stdout.execute()
         results = self._parse_output(output)
         for key, value in expected.items():
             print("results[%s] == %s" % (key, value))
@@ -400,7 +403,7 @@ class TestMLogInfo(object):
 
     def test_sharding_missing_information(self):
         self.tool.run('--sharding --errors --migrations %s' % self.logfile_path)
-        output = sys.stdout.getvalue()
+        output = sys.stdout.execute()
         lines = output.splitlines()
 
         assert any(map(lambda line: 'no sharding info found.' in line, lines))
@@ -412,7 +415,7 @@ class TestMLogInfo(object):
     def test_sharding_overview_shard(self):
         self._test_init('sharding_360_shard.log')
         self.tool.run('--sharding %s' % self.logfile_path)
-        output = sys.stdout.getvalue()
+        output = sys.stdout.execute()
         lines = output.splitlines()
 
         assert any(map(lambda line: '(shard)' in line, lines))
@@ -426,7 +429,7 @@ class TestMLogInfo(object):
     def test_sharding_overview_csrs(self):
         self._test_init('sharding_360_CSRS.log')
         self.tool.run('--sharding %s' % self.logfile_path)
-        output = sys.stdout.getvalue()
+        output = sys.stdout.execute()
         lines = output.splitlines()
 
         assert any(map(lambda line: '(CSRS)' in line, lines))
@@ -443,7 +446,7 @@ class TestMLogInfo(object):
     def test_sharding_overview_mongos(self):
         self._test_init('sharding_360_mongos.log')
         self.tool.run('--sharding %s' % self.logfile_path)
-        output = sys.stdout.getvalue()
+        output = sys.stdout.execute()
         lines = output.splitlines()
 
         assert any(map(lambda line: '(mongos)' in line, lines))
@@ -457,7 +460,7 @@ class TestMLogInfo(object):
     def test_sharding_error_messages_exists(self):
         self._test_init('sharding_360_shard.log')
         self.tool.run('--sharding --errors %s' % self.logfile_path)
-        output = sys.stdout.getvalue()
+        output = sys.stdout.execute()
         lines = output.splitlines()
 
         # Find errors which match the format "  <count> <error_message>"
@@ -534,7 +537,7 @@ class TestMLogInfo(object):
         """ utility test runner for sharding tables
         """
         self.tool.run('--sharding --migrations %s' % logfile_path)
-        output = sys.stdout.getvalue()
+        output = sys.stdout.execute()
         lines = output.splitlines()
 
         for index, line in enumerate(lines):

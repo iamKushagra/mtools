@@ -4,8 +4,7 @@ import os
 import shutil
 from distutils.version import LooseVersion
 
-from nose.plugins.skip import SkipTest
-from nose.tools import raises
+import pytest
 
 from mtools.mlaunch.mlaunch import MLaunchTool
 
@@ -13,31 +12,34 @@ from mtools.mlaunch.mlaunch import MLaunchTool
 class TestMLaunch(object):
 
     # Setup & teardown functions
-
-    def setUp(self):
+    @pytest.fixture(autouse=True)
+    def setup_class(self):
+        """Start up method to create mlaunch tool and find free port."""
         self.base_dir = 'data_test_mlaunch'
         self.tool = MLaunchTool(test=True)
         self.tool.args = {'verbose': False}
         self.mongod_version = self.tool.getMongoDVersion()
 
-    def tearDown(self):
+        yield
+
+        """Tear down method after each test, removes data directory."""
         self.tool = None
         if os.path.exists(self.base_dir):
             shutil.rmtree(self.base_dir)
 
     # Helper functions
 
-    @raises(SystemExit)
     def run_tool(self, arg_str):
-        """Wrapper to call self.tool.run() with or without auth."""
-        # name data directory according to test method name
-        caller = inspect.stack()[1][3]
-        self.data_dir = os.path.join(self.base_dir, caller)
+        with pytest.raises(SystemExit):
+            """Wrapper to call self.tool.run() with or without auth."""
+            # name data directory according to test method name
+            caller = inspect.stack()[1][3]
+            self.data_dir = os.path.join(self.base_dir, caller)
 
-        # add data directory to arguments for all commands
-        arg_str += ' --dir %s' % self.data_dir
+            # add data directory to arguments for all commands
+            arg_str += ' --dir %s' % self.data_dir
 
-        self.tool.run(arg_str)
+            self.tool.run(arg_str)
 
     def read_config(self):
         """Read the generated mlaunch startup file, get the command lines."""
@@ -90,27 +92,27 @@ class TestMLaunch(object):
     def check_csrs(self):
         """Check if CSRS is supported, skip test if unsupported."""
         if LooseVersion(self.mongod_version) < LooseVersion('3.1.0'):
-            raise SkipTest('CSRS not supported by MongoDB < 3.1.0')
+            pytest.skip('reasCSRS not supported by MongoDB < 3.1.0')
 
     def check_sccc(self):
         """Check if SCCC is supported, skip test if unsupported."""
         if LooseVersion(self.mongod_version) >= LooseVersion('3.3.0'):
-            raise SkipTest('SCCC not supported by MongoDB >= 3.3.0')
+            pytest.skip('SCCC not supported by MongoDB >= 3.3.0')
 
     def check_3_4(self):
         """Check for MongoDB 3.4, skip test otherwise."""
         if LooseVersion(self.mongod_version) < LooseVersion('3.4.0'):
-            raise SkipTest('MongoDB version is < 3.4.0')
+            pytest.skip('MongoDB version is < 3.4.0')
 
     def check_3_6(self):
         """Check for MongoDB 3.6, skip test otherwise."""
         if LooseVersion(self.mongod_version) < LooseVersion('3.6.0'):
-            raise SkipTest('MongoDB version is < 3.6.0')
+            pytest.skip('MongoDB version is < 3.6.0')
 
-    @raises(IOError)
     def raises_ioerror(self):
-        """Check for IOError exceptions"""
-        self.read_config()
+        with pytest.raises(IOError):
+            """Check for IOError exceptions"""
+            self.read_config()
 
     # Tests
 
@@ -514,11 +516,11 @@ class TestMLaunch(object):
             )
         self.cmdlist_assert(cmdlist)
 
-    @raises(IOError)
     def test_hostname_3_6(self):
         """
         mlaunch should not start if hostname is specified but not bind_ip.
         """
-        self.check_3_6()
-        self.run_tool('init --replicaset --hostname this_host')
-        self.read_config()
+        with pytest.raises(IOError):
+            self.check_3_6()
+            self.run_tool('init --replicaset --hostname this_host')
+            self.read_config()
