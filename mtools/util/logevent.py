@@ -65,8 +65,8 @@ class LogEvent(object):
             doc_or_str = doc_or_str.decode("utf-8")
 
         if isinstance(doc_or_str, str) and doc_or_str.startswith('{'):
-            self.from_json(doc_or_str)
-            self._reset()
+            self.doc = json.loads(doc_or_str)
+            self._parse_logv2()
 
         if isinstance(doc_or_str, str) or (sys.version_info.major == 2 and isinstance(doc_or_str, re.UNICODE)):
             # create from string, remove line breaks at end of _line_str
@@ -80,6 +80,47 @@ class LogEvent(object):
             self._profile_doc = doc_or_str
             # docs don't need to be parsed lazily, they are fast
             self._parse_document()
+
+    def _parse_logv2(self):
+
+        """Parse logv2 format"""
+
+        self._reset()
+
+        self._datetime_calculated = True    # no need to parse datetime
+        self._datetime = self.doc['t']['$date']
+
+        self._category = True
+        self._category = self.doc['c']
+
+        self._split_tokens_calculated = True
+        self._split_tokens = None
+
+        self._duration_calculated = True
+        self._duration = self.doc['attr']['durationMillis']
+
+        self._thread_calculated = True
+        self._thread = self.doc['ctx']
+
+        self._operation_calculated = True
+        self._operation = self.doc['attr']['CRUD']['op']
+        self._namespace = self.doc['attr']['CRUD']['ns']
+
+        self._command_calculated = True
+        if self.doc['attr'].keys() == True:
+            new_log = list(self.doc['attr'].keys())
+            self._command = new_log[0]
+
+        self._nscanned = None         # keysExamined
+        self._nscannedObjects = None  # docsExamined
+        self._ntoreturn = None
+        self._nupdated = None         # nModified
+        self._nreturned = None        # nReturned or nMatched (updates)
+        self._ninserted = None        # nInserted
+        self._ndeleted = None  
+
+
+
 
     def _reset(self):
         self._debug = False
@@ -223,7 +264,7 @@ class LogEvent(object):
                     self._duration = int(matchobj.group(1))
             # SERVER-16176 - Logging of slow checkpoints
             elif "Checkpoint took" in self.line_str:
-                matchobj = re.search("Checkpoint took ([\d]+) seconds to complete", self.line_str)
+                matchobj = re.search(r"Checkpoint took ([\d]+) seconds to complete", self.line_str)
                 if matchobj:
                     self._duration = int(matchobj.group(1)) * 1000
 
